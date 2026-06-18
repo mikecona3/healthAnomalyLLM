@@ -8,4 +8,5 @@ v0.1
 -solid structure of LLM that will be used combined with a custom algorithm to pull health data from an smartwatch to find anomalies in health tracking
 
 *NOTE*
-Open source files are different from final versions, not all features will be shown here. The Github repo is typically 1-2 versions behind actual models. 
+1. Open source files are different from final versions, not all features will be shown here. The Github repo is typically 1-2 versions behind actual models. 
+2. A custom algorithm has been developed to work in conjunction (with the LLM)...COMING SOON. 
