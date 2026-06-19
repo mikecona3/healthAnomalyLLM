@@ -11,10 +11,10 @@ the individual person, and this data all lives on device so your personal health
 
 v0.1 beta 
   Comments:
-    -Initial commit 
-    -Basic structure of LLM
+    *Initial commit 
+    *Basic structure of LLM
 
   Known bugs:
-    -Blood oxygen, blood gluclose levels not being read (algorithmically) and will not produce data 
-    -Sometimes skips level 1 flags to send to level 2 LLM 
-    -Results list sometimes times-out and produces no results to user 
+    *Blood oxygen, blood gluclose levels not being read (algorithmically) and will not produce data 
+    *Sometimes skips level 1 flags to send to level 2 LLM 
+    *Results list sometimes times-out and produces no results to user 
