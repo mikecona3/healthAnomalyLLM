@@ -8,6 +8,19 @@ the individual person, and this data all lives on device so your personal health
   is typically between 0.1-0.3 versions behind what's happening in the background.</p>
 
 <h3><b>Changelog</b></h3>
+<p>v0.2 beta</p>
+  <ul>
+    <li>Added support for more health metrics; blood oxygen fixed, blood gluclose added</li>
+    <li>Code clean-up; structure has changed as health data is displayed</li>
+    <li>Health data syncing works most of the time</li>
+  </ul>
+
+<p>Known bugs</p>
+  <ul>
+    <li>Coming soon</li>
+  </ul>
+
+
 <p>v0.1 beta</p>
   <ul>
     <li>Initial commit</li>
