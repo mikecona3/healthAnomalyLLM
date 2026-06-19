@@ -11,13 +11,14 @@ import google.generativeai as genai
 @dataclass
 class HealthRecord:
     timestamp: str
-    heart_rate: Optional[float] = None
-    hrv: Optional[float] = None
-    steps: Optional[int] = None 
+    heart_rate: float = None
+    hrv: float = None
+    steps: int = None 
+    resting_hr: float = None 
+    calories_burned: float = None
     sleep_hours: Optional[float] = None 
-    spo2: Optional[float] = None 
-    resting_hr: Optional[float] = None 
-    calories_burned: Optional[float] = None
+    spo2: Optional[float] = None
+    blood_glucose: Optional[float] = None
     stress_score: Optional[float] = None 
 
 
@@ -27,6 +28,7 @@ class Anomaly:
     value: float
     timestamp: str
     reason: str                  # flag from Layer 1
+    #severity - leave as low, med, hi or number scale?
     severity: str                # rated as low, medium or high
     context_window: list[dict]   # surrounding records for LLM
 
@@ -38,9 +40,12 @@ class StatisticalScreener:
 
     # Hard bounds regardless of baselines 
     HARD_BOUNDS = {
+        # check l/h numbers for accuracy in real world 
         "heart_rate":  (30, 250),
-        "spo2":        (50, 100),
         "hrv":         (10, 300),
+        "resting_hr": (30, 150),
+        "spo2":        (50, 100),
+        "blood_glucose": (50, 140),
         "stress_score":(0, 100),
     }
 
@@ -57,7 +62,7 @@ class StatisticalScreener:
     def _compute_baselines(self) -> dict:
         metrics = [
             "heart_rate", "hrv", "steps", "sleep_hours",
-            "spo2", "resting_hr", "calories_burned", "stress_score"
+            "spo2", "blood_glucose", "resting_hr", "calories_burned", "stress_score"
         ]
         baselines = {}
         for m in metrics:
@@ -125,6 +130,7 @@ class StatisticalScreener:
             # custom multi-metric rules
             anomalies += self._check_hr_spo2_combo(record, context)
             anomalies += self._check_sleep_hrv_combo(record, context)
+            # specialized metrics for blood glucose, stress score, etc 
 
         return anomalies
 
