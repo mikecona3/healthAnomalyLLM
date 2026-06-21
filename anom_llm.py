@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import google.generativeai as genai
 
-
+from wearable_api import HeartRateReading, StepReading, SleepReading, SpO2Reading, BloodGlucoseReading, StressScoreReading
 
 @dataclass
 class HealthRecord:
@@ -20,6 +20,10 @@ class HealthRecord:
     spo2: Optional[float] = None
     blood_glucose: Optional[float] = None
     stress_score: Optional[float] = None 
+    respiratory_rate: Optional[float] = None
+    body_temperature: Optional[float] = None
+    skin_temp_variation: Optional[float] = None
+    ecg_rhythm: Optional[str] = None
 
 
 @dataclass
@@ -28,7 +32,6 @@ class Anomaly:
     value: float
     timestamp: str
     reason: str                  # flag from Layer 1
-    #severity - leave as low, med, hi or number scale?
     severity: str                # rated as low, medium or high
     context_window: list[dict]   # surrounding records for LLM
 
@@ -38,21 +41,23 @@ class Anomaly:
 class StatisticalScreener:
     # run 1st to save API calls/tokens  
 
-    # Hard bounds regardless of baselines 
+    # hard bounds regardless of baselines 
     HARD_BOUNDS = {
-        # check l/h numbers for accuracy in real world 
         "heart_rate":  (30, 250),
         "hrv":         (10, 300),
         "resting_hr": (30, 150),
         "spo2":        (50, 100),
         "blood_glucose": (50, 140),
         "stress_score":(0, 100),
+        "respiratory_rate": (5, 35),       
+        "skin_temp_variation": (-2.0, 2.0),
+        "body_temperature": (50, 120),
     }
 
-    # measurement of deviations
+    ECG_CONCERNING_VALUES = {"afib", "high_hr", "low_hr", "inconclusive"}
+
     ZSCORE_THRESHOLD = 2.5
 
-    # records to complete a personal baseline for z-score calculations
     MIN_BASELINE_RECORDS = 7
 
     def __init__(self, records: list[HealthRecord]):
@@ -62,7 +67,8 @@ class StatisticalScreener:
     def _compute_baselines(self) -> dict:
         metrics = [
             "heart_rate", "hrv", "steps", "sleep_hours",
-            "spo2", "blood_glucose", "resting_hr", "calories_burned", "stress_score"
+            "spo2", "resting_hr", "calories_burned", "stress_score",
+            "respiratory_rate", "skin_temp_variation", "body_temperature"
         ]
         baselines = {}
         for m in metrics:
@@ -98,7 +104,7 @@ class StatisticalScreener:
                 if value is None:
                     continue
 
-                # hard bounds check
+                # Hard bounds check
                 if not (lo <= value <= hi):
                     anomalies.append(Anomaly(
                         metric=metric,
@@ -110,7 +116,6 @@ class StatisticalScreener:
                     ))
                     continue
 
-                # checks deviations from personal baseline
                 z = self._zscore(metric, value)
                 if z is not None and z >= self.ZSCORE_THRESHOLD:
                     b = self._baselines[metric]
@@ -127,15 +132,15 @@ class StatisticalScreener:
                         context_window=context,
                     ))
 
-            # custom multi-metric rules
             anomalies += self._check_hr_spo2_combo(record, context)
             anomalies += self._check_sleep_hrv_combo(record, context)
-            # specialized metrics for blood glucose, stress score, etc 
+            anomalies += self._check_respiratory_spo2_combo(record, context)
+            anomalies += self._check_ecg_rhythm(record, context)
 
         return anomalies
 
     def _check_hr_spo2_combo(self, r: HealthRecord, ctx: list[dict]) -> list[Anomaly]:
-        # check for high hr + low spo2 combo 
+        """High HR + low SpO2 together is more alarming than either alone."""
         found = []
         if r.heart_rate and r.spo2:
             if r.heart_rate > 110 and r.spo2 < 94:
@@ -150,7 +155,7 @@ class StatisticalScreener:
         return found
 
     def _check_sleep_hrv_combo(self, r: HealthRecord, ctx: list[dict]) -> list[Anomaly]:
-        # check for low sleep values + low HRV combo
+        """Low sleep + low HRV suggests under-recovery."""
         found = []
         if r.sleep_hours and r.hrv:
             if r.sleep_hours < 5 and r.hrv < 20:
@@ -164,34 +169,54 @@ class StatisticalScreener:
                 ))
         return found
 
+    def _check_respiratory_spo2_combo(self, r: HealthRecord, ctx: list[dict]) -> list[Anomaly]:
+        """Elevated respiratory rate with low SpO2 can indicate respiratory distress
+        or illness onset (e.g. infection), especially if observed during sleep/rest."""
+        found = []
+        if r.respiratory_rate and r.spo2:
+            if r.respiratory_rate > 20 and r.spo2 < 95:
+                found.append(Anomaly(
+                    metric="respiratory_rate+spo2",
+                    value=r.respiratory_rate,
+                    timestamp=r.timestamp,
+                    reason=(
+                        f"Elevated respiratory rate ({r.respiratory_rate} br/min) "
+                        f"with reduced SpO2 ({r.spo2}%)"
+                    ),
+                    severity="high",
+                    context_window=ctx,
+                ))
+        return found
 
-# LLM analysis
+    def _check_ecg_rhythm(self, r: HealthRecord, ctx: list[dict]) -> list[Anomaly]:
+        """Surface device-classified rhythm flags. The watch does the signal
+        classification; this just decides which classifications are worth
+        escalating to the LLM for contextual interpretation."""
+        found = []
+        if r.ecg_rhythm and r.ecg_rhythm.lower() in self.ECG_CONCERNING_VALUES:
+            rhythm = r.ecg_rhythm.lower()
+            severity = "high" if rhythm == "afib" else "medium"
+            found.append(Anomaly(
+                metric="ecg_rhythm",
+                value=rhythm,
+                timestamp=r.timestamp,
+                reason=f"Device classified ECG rhythm as '{rhythm}'",
+                severity=severity,
+                context_window=ctx,
+            ))
+        return found
+
+
+# llm analysis 
 
 class LLMAnalyzer:
-    # sends flagged anomalies to gemini, batches multiples together to reduce API/tokens 
-
-    def __init__(self, model: str = "gemini-1.5-flash"):
-        api_key = os.environ.get("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "GOOGLE_API_KEY environment variable not set. "
-                "Please run: export GOOGLE_API_KEY='your-api-key'")
-        genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+    
+    def __init__(self, model: str = "claude-sonnet-4-6"):
+        self.client = anthropic.Anthropic()
         self.model = model
-        self.client = genai.GenerativeModel(
-            model_name=self.model,
-            system_instruction=self.SYSTEM_PROMPT
-        )
 
     def analyze(self, anomalies: list[Anomaly], user_context: str = "") -> dict:
-        """
-        Send a batch of anomalies to the LLM for analysis.
-
-        Args:
-            anomalies: Flagged anomalies from Layer 1
-            user_context: Optional free-text about the user
-                          (e.g. "42-year-old recreational runner, no known conditions")
-        """
+        
         if not anomalies:
             return {
                 "anomaly_assessments": [],
@@ -219,33 +244,30 @@ class LLMAnalyzer:
             f"```json\n{json.dumps(payload, indent=2)}\n```"
         )
 
-        response = self.client.generate_content(
-            user_message,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                max_output_tokens=1500,
-            )
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=1500,
+            system=self.SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}]
         )
 
-        return json.loads(response.text)
+        raw = response.content[0].text.strip()
+        # Strip markdown fences if the model wraps output
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
 
 
 # orchestrator
 
 class HealthAnomalyDetector:
-    # combines layer data and returns report 
     
-    """
-    Usage:
-        detector = HealthAnomalyDetector(records)
-        report = detector.run(user_context="35yo male, trains 5x/week")
-        print(report["overall_summary"])
-    """
-
-    def __init__(self, records: list[HealthRecord], model: str = "gemini-1.5-flash"):
+    def __init__(self, records: list[HealthRecord]):
         self.records = records
         self.screener = StatisticalScreener(records)
-        self.analyzer = LLMAnalyzer(model=model)
+        self.analyzer = LLMAnalyzer()
 
     def run(self, user_context: str = "") -> dict:
         print(f"[Layer 1] Screening {len(self.records)} records...")
@@ -268,63 +290,3 @@ class HealthAnomalyDetector:
             "raw_anomalies": [asdict(a) for a in anomalies],
             **llm_result,
         }
-
-
-# internal test - not included in final release 
-
-def _generate_sample_data() -> list[HealthRecord]:
-    """Generate 14 days of plausible health data with a few planted anomalies."""
-    import random
-    random.seed(42)
-    records = []
-    base = datetime(2026, 6, 1, 7, 0, 0)
-
-    for day in range(14):
-        dt = base + timedelta(days=day)
-        hr = random.gauss(68, 6)
-        hrv = random.gauss(55, 10)
-        spo2 = random.gauss(97.5, 0.8)
-        sleep = random.gauss(7.2, 0.7)
-
-        # anomaly 1 - high HR + low SpO2
-        if day == 10:
-            hr = 150
-            spo2 = 81
-
-        # anomaly 2 - very low HRV + poor sleep
-        if day == 12:
-            hrv = 12
-            sleep = 1.0
-
-        records.append(HealthRecord(
-            timestamp=dt.isoformat(),
-            heart_rate=round(hr, 1),
-            hrv=round(hrv, 1),
-            spo2=round(min(spo2, 100), 1),
-            sleep_hours=round(max(sleep, 0), 1),
-            steps=random.randint(4000, 12000),
-            resting_hr=round(random.gauss(58, 4), 1),
-            stress_score=round(random.gauss(35, 15), 1),
-        ))
-
-    return records
-
-
-if __name__ == "__main__":
-    records = _generate_sample_data()
-    detector = HealthAnomalyDetector(records)
-    report = detector.run(user_context="34-year-old recreational runner, no known conditions")
-
-    print("\n" + "=" * 60)
-    print(f"Anomalies found: {report['anomalies_found']}")
-    print(f"\nSummary: {report['overall_summary']}")
-
-    if report.get("patterns_detected"):
-        print(f"\nPatterns: {', '.join(report['patterns_detected'])}")
-
-    print("\nDetailed assessments:")
-    for a in report.get("anomaly_assessments", []):
-        print(f"  [{a['concern_level'].upper()}] {a['timestamp']} — {a['metric']}")
-        print(f"    Likely cause: {a['likely_cause']}")
-        if a.get("notes"):
-            print(f"    Notes: {a['notes']}")
