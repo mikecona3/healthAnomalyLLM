@@ -8,6 +8,13 @@ the individual person, and this data all lives on device so your personal health
   is typically between 0.1-0.3 versions behind what's happening in the background.</p>
 
 <h3><b>Changelog</b></h3>
+<p>v0.5.1 beta</p>
+  <ul>
+    <li>Added even more metrics!</li>
+    <li>Some metrics are now 'optional' to avoid returning errors in app</li>
+    <li>Algorithm adjustment to better read data from Apple Health, Google Health, and standalone devices</li>
+  </ul>
+
 <p>v0.2 beta</p>
   <ul>
     <li>Added support for more health metrics; blood oxygen fixed, blood gluclose added</li>
