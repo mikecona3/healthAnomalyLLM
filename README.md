@@ -1,43 +1,33 @@
-<h1>Personalized Health Anomaly Detection LLM</h1>
+<h1>Health Data Anomaly Detection</h1>
+<h2>Helping you discover health issues sooner</h2>
 
-<p>Introducing a brand-new algoirthm for tracking health data and a personalized LLM that helps detects health conditions/potential issues early!
-The LLM includes "hard limits" that are considered dangerous and never change, "personal limits" that dynamically adjust over time based on 
-the individual person, and this data all lives on device so your personal health data isn't shared.</p>
+<p>Introducing a personalized LLM that is paired with a detection algorithm to help detect potential health conditions/issues early!
+The LLM introduces "hard limits" that are considered "dangerous" across the board, while "personal limits" dynamically adjust over time on
+an individual level. All of this data will be encrypted and live on device!</p>
 
-<p>* Note: This is a non-working standalone LLM, purposely. It includes no data and can not independently receive data. The model that lives here
-  is typically between 0.1-0.3 versions behind what's happening in the background.</p>
-
-<h3><b>Changelog</b></h3>
-<p>v0.5.1 beta</p>
-  <ul>
-    <li>Added even more metrics!</li>
-    <li>Some metrics are now 'optional' to avoid returning errors in app</li>
-    <li>Algorithm adjustment to better read data from Apple Health, Google Health, and standalone devices</li>
-  </ul>
-
-<p>v0.2 beta</p>
-  <ul>
-    <li>Added support for more health metrics; blood oxygen fixed, blood gluclose added</li>
-    <li>Code clean-up; structure has changed as health data is displayed</li>
-    <li>Health data syncing works most of the time</li>
-  </ul>
-
-<p>Known bugs</p>
-  <ul>
-    <li>Coming soon</li>
-  </ul>
+<b>Please Note:</b>
+<p>This is only the LLM model. It is non working, purposely, as it requires health data to be synced for the full model to work properly. 
+The model that lives on Github is typically a few versions behind the actual "for production" model.</p>
 
 
-<p>v0.1 beta</p>
-  <ul>
-    <li>Initial commit</li>
-    <li>Basic structure of LLM</li>
-    <li>Health data syncing</li>
-  </ul>
-
-<p>Known bugs</p>
-  <ul>
-    <li>Blood oxygen, blood gluclose levels not being read (algorithmically) and will not produce data</li>
-    <li>Sometimes skips level 1 flags to send to level 2 LLM</li>
-    <li>Results list sometimes times-out and produces no results to user </li>
-  </ul>
+<h3>Changelog:</h3>
+  <div>
+    <h6>Current Known Bugs:</h6>
+      <ul>
+        <li>Health data syncs correctly ~85% of the time</li>
+        <li>Blood oxygen, blood gluclose levels do not produce a result</li>
+        <li>Level 1 (algo) sometimes skips flags to send to level 2 resulting in missed flags</li>
+        <li>Results list in app sometimes will time out and show no results</li>
+      </ul>
+  </div>
+  
+  
+  <div>
+    <h6>v0.5.1</h6>
+    <h6>What's New?</h6>
+      <ul>
+        <li>Added 5 more metrics!</li>
+        <li>Some metrics are now labeled 'optional' to prevent return errors</li>
+        <li>Now able to sync data with Apple Health, Google Health, & some standalone devices</li>
+      </ul>
+  </div>
