@@ -1,0 +1,6 @@
+# Health Anomaly Detector — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+anthropic>=0.40.0      # Claude API — Layer 2 LLM interpretation
+tkinterdnd2>=0.3.0     # Drag-and-drop support for the macOS GUI
+requests>=2.31.0       # Fitbit REST API calls
