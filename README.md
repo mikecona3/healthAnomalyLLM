@@ -1,59 +1,7 @@
-# 🫀 Health Anomaly Detector
+# Health Anomaly Detector
 
-A two-layer anomaly detection pipeline over Apple Health and Fitbit wearable data.
-Layer 1 runs a fast statistical pre-screen to catch genuine anomalies without wasting
-API tokens. Layer 2 sends only the flagged readings to Claude for plain-English
-interpretation.
-
----
-
-## Architecture
-
-```
-Apple Health export.zip          Fitbit REST API
-        │                               │
-        ▼                               ▼
- adapters/apple_health.py     adapters/fitbit.py
-        │                               │
-        └──────────┬────────────────────┘
-                   │  list[HealthRecord]
-                   ▼
-          vitals_monitor.py
-          StatisticalScreener
-          ┌─────────────────────────────┐
-          │ 1. Hard physiological bounds│  ← catches acute events
-          │ 2. Personal z-score         │  ← catches "unusual for YOU"
-          │ 3. Multi-metric combo rules │  ← HR+SpO₂, sleep+HRV, etc.
-          └─────────────────────────────┘
-                   │  list[Anomaly]  (only if anomalies found)
-                   ▼
-       health_anomaly_detector.py
-            LLMAnalyzer  →  Claude API
-                   │
-                   ▼
-          Plain-English interpretation
-          per anomaly + overall summary
-```
-
----
-
-## File Structure
-
-```
-health-anomaly-detector/
-│
-├── gui.py                      # macOS GUI — drag & drop + results table + AI button
-├── vitals_monitor.py           # HealthRecord, Anomaly, StatisticalScreener (Layer 1)
-├── health_anomaly_detector.py  # LLMAnalyzer, HealthAnomalyDetector (Layer 2)
-├── run_pipeline.py             # CLI entry point
-├── requirements.txt
-├── README.md
-│
-└── adapters/
-    ├── __init__.py
-    ├── apple_health.py         # Parses Apple Health export.zip → list[HealthRecord]
-    └── fitbit.py               # Fitbit REST API → list[HealthRecord]
-```
+A two-layer health anomaly detection pipeline now works with Apple Health, Google Health and Fitbit wearable data. Layer 1 runs a fast statistical 
+pre-screen to catch genuine anomalies without wasting API tokens. Layer 2 sends only the flagged readings to Claude for plain-English interpretation.
 
 ---
 
@@ -86,8 +34,7 @@ python gui.py
 Then on your iPhone:
 > **Health app → Profile photo → Export All Health Data**
 
-AirDrop or cable-transfer the `export.zip` to your Mac, then drag it onto
-the drop zone in the app.
+AirDrop or cable-transfer the `export.zip` to your Mac, then drag it onto the drop zone in the app.
 
 **What happens:**
 1. The export is parsed in the background (large files show progress in the status bar)
@@ -176,7 +123,5 @@ future release.
 ## Notes
 
 - **ANTHROPIC_API_KEY** must be set for the LLM layer. Layer 1 (stats) works without it.
-- **Google Fit API** was shut down June 2025. Fitbit is the recommended Android source.
-- **Health Connect** (Android) is SDK-only with no REST API — requires an Android companion app.
 - This tool is **not a medical device** and does not provide medical diagnoses.
   Always consult a healthcare professional for anything concerning.
